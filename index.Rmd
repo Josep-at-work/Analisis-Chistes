@@ -1,7 +1,7 @@
 ---
 title: "Análisis de Chistes"
 description: |
-  A new article created using the Distill format.
+  Análisis de chistes scrapeados. Proyecto de la asignatura Mineria de Texto, MADM, UIB.
 author:
   - name: Josep R.C.
     url: https://www.linkedin.com/in/josep%F0%9F%8C%AB-roman-cardell-414880184/

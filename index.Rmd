@@ -5,14 +5,16 @@ description: |
 author:
   - name: Josep R.C.
     url: https://www.linkedin.com/in/josep%F0%9F%8C%AB-roman-cardell-414880184/
-    affiliation: github
-    affiliation_url: https://github.com/Josep-at-work 
+    affiliation: UIB Student
+    affiliation_url: https://www.uib.cat/
 date: "`r Sys.Date()`"
 output: 
   distill::distill_article:
     toc: true
     toc_depth: 3
     toc_float: true
+    code_folding: true
+    theme: theme1.css
     selfe_contained: false
 ---
 
@@ -20,8 +22,13 @@ output:
 knitr::opts_chunk$set(
 	echo = TRUE,
 	message = FALSE,
-	warning = FALSE
+	warning = FALSE,
+	R.options = list(width = 70)
 )
+
+```
+
+```{r code_folding = "Librerias"}
 library(tidyverse)
 library(tidytext)
 library(jsonlite)
@@ -31,8 +38,9 @@ library(ggplot2)
 library(stringr)
 library(topicmodels)
 library(textclean)
-library(kableExtra)
+library(rmarkdown)
 ```
+
 
 # 1. Lectura Json
 
@@ -45,15 +53,16 @@ library(kableExtra)
   + Un valor por fila y atributo.
   + Además de título, categoría y texto, tiene los votos de cada chiste.
 
-```{r 1000c}
+```{r 1000c, code_folding = "Carga 1000Chistes"}
+options(width = 60)
 data1 = jsonlite::fromJSON("Data/1000chistes.json") %>% select(c(title, text))
-head(data1, 5)
-summary(data1)
+head(data1)
+summary(data1, 5)
 ```
 
 El primer dataset contiene 2422 chistes.
 
-```{r Pinta}
+```{r Pinta, code_folding = "Pintamania"}
 data2 = jsonlite::fromJSON("Data/chistes_Pintamania.json") %>% select(-votes)
 head(data2, 5)
 summary(data2)
@@ -66,7 +75,7 @@ El archivo de *pintamania* contiene 4750 objetos. En este caso la variable categ
 
 En este caso los documentos que forman el corpus son dos, los chistes de la web *1000chistes* y los de *Pintamania*. El corpus contiene el texto a analizar, además de el título del texto, el documento al que pertenecen y en el caso de la segunda web también la categoría a la que pertenecen.  
 
-```{r Corpus}
+```{r Corpus,  code_folding = "Corpus"}
 corpus <- bind_rows(data1 %>% 
                        mutate(web = "1000chistes"),
                      data2 %>%
@@ -75,7 +84,7 @@ corpus <- bind_rows(data1 %>%
 head(corpus, 5)
 ```
 
-```{r Tokenization}
+```{r Tokenization,  code_folding = "Tokenization"}
 tidy_chistes <- corpus %>%
   unnest_tokens(word, text)
 head(tidy_chistes, 5) #antes de descartar stopwords
@@ -95,7 +104,7 @@ tidy_chistes %<>% filter( word %in% words)
 
 También se han eliminado las *stop words* usando la lista de palabras en español del paquete *tm*.
 
-```{r stopwords}
+```{r stopwords,  code_folding = "Stop Words"}
 tmstop_words = data_frame(word = tm::stopwords("spanish"), lexicon = "custom") 
 
 tidy_chistes2 <- tidy_chistes %>%
@@ -121,7 +130,8 @@ Estas palabras se pueden identificar en muchos chistes en español, sobretodo pa
 # 3. Frecuencias
 
 A continuación se ha calculado la distribución de las frecuencias de las palabras por separado para cada página web. 
-```{r tfbyweb}
+
+```{r tfbyweb,  code_folding = "Frecuencia por web"}
 chistes_words <- tidy_chistes %>% 
   count(web, word, sort = T) 
 
@@ -143,7 +153,7 @@ La distribución es similar, muchas palabras aparecen pocas veces y menos palabr
 
 ### Ley de Zipf
 
-```{r Zipf}
+```{r Zipf,  code_folding = "Zipf's Law"}
 freq_by_rank <- chistes_words %>%
   group_by(web) %>%
   mutate(rank = row_number(),
@@ -167,7 +177,7 @@ En está sección se ha analizado la importancia de las palabras usando la métr
 
 Para este análisis no se han eliminado las *stop words* ya que están son descartadas en un inicio  al ser su valor para la métrica *idf* igual a 0. 
 
-```{r tf-idf}
+```{r tf-idf, code_folding = "tf-idf", layout = "l-body-outset"}
 chistes_tf_idf <- chistes_words %>%
   bind_tf_idf(word, web, n)
 
@@ -175,8 +185,7 @@ chistes_tf_idf %>%
   select(-total) %>%
   arrange(desc(tf_idf)) %>%
   head(10) %>%
-  kable(align = "llllll" , caption = "tf-idf", booktabs = T) %>%
-  kable_styling(latex_options = "hold_position", font_size = 8) 
+  paged_table() 
 ```
 
 La primera observación sobre la tabla anterior es que el valor *idf* es el mismo para todas las palabras ya que solo hay dos paginas web, entonces solo puedes ser 0.69 o 0. También comentar que la diferencia de chistes entre ambas webs es significativa por lo que con menos apariciones de una palabra, *n*, es suficiente en la web de *1000Chistes* para obtener un valor más elevado de *tf-idf*. Por esto, se han separado los valores de está métrica por página web para visualizar de forma clara que palabras son más importantes para cada página. 
@@ -205,6 +214,7 @@ corpus %>%
 Se confirma la hipótesis anterior, aunque solo aparecen dos chistes por lo que sigue siendo más característico para el otro documento.
 
 Como último análisis de este apartado se han eliminado las 7 palabras más *importantes* de *Pintamania* las cuáles carecen de significado, para descubrir que palabras son realmente importantes.
+
 ```{r stopwords2}
 stopwords2 <- data.frame(word = c("q", "ke", "ala", "xd", "avia", "abia", "havia", "entonses"))
 
@@ -236,7 +246,8 @@ En este apartado se ha procedido a modificar el formato de los datos. Hasta el m
 Este formato tiene una estructura distinta donde cada **columna representa una palabra** (*term*), cada **fila un documento**, y cada **valor es la frecuencia con la que un termino aparece en un documento**. Este hecho provoca que en un corpus con muchos documentos haya muchos valores nulos ya que no todas las palabras se encuentran en todos los documentos. Es por ello que esta estructura está contenida en una matriz *sparseada*.
 
 En este caso se ha usado el dataframe que no contiene las stopwords, para que estás no aparezcan en la DTM. También se han eleminado las stopwords editadas apartir del ranking de palabras importantes de *Pintamania*. 
-```{r DTM}
+
+```{r DTM, code_folding = "DTM"}
 DTM <- tidy_chistes2 %>%
   count(web, word, sort=T) %>%
   anti_join(stopwords2, by = "word") %>%
@@ -258,15 +269,17 @@ En este apartado se ha aplicado un algoritmo no supervisado, similar a un cluste
 + Cada temática está formada por una mezcla de palabras.
 
 El *input* para este algoritmo es la DTM definida en el apartado anterior y el parámetro *k* se ha definido de manera que divida entre 10 temáticas:
-```{r}
+
+```{r, code_folding = "LDA"}
 lda_10 <- LDA(DTM, k = 10, control = list(seed = 1234))
 lda_10
 ```
+
 ### Probabilidad Palabra-Temática
 
 Primero se ha analizado con que probabilidad las palabra pertenecen a una temática determinada. 
 
-```{r}
+```{r,  code_folding = "10 topics", layout="l-body-outset"}
 topics_10 <- tidy(lda_10, matrix = 'beta')
 
 top_terms_10 <- topics_10 %>%
@@ -280,16 +293,18 @@ top_terms_10 %>%
   ggplot(aes(beta, term, fill = factor(topic))) +
   geom_col(show.legend = FALSE) +
   facet_wrap(~ topic, scales = "free") +
-  scale_y_reordered()
+  scale_y_reordered() +
+  ggtitle("Top palabras por topic") +
+  theme_minimal()
 ```
 
 La representación anterior muestra que la mayoría de palabras coinciden en las 10 temáticas que ha definido el modelo. Estas palabras coinciden con las más frecuentes del corpus en general. Con el fin de ajustar mejor las temáticas se ha realizado un análisi con un número más reducido de temáticas:
 
-```{r}
+```{r, code_folding = "5 topics"}
 lda_5 <- LDA(DTM, k = 5, control = list(seed = 1234))
 ```
 
-```{r}
+```{r, code_folding = "beta", layout="l-body-outset"}
 topics_5 <- tidy(lda_5, matrix = 'beta')
 
 top_terms_5 <- topics_5 %>%
@@ -303,7 +318,9 @@ top_terms_5 %>%
   ggplot(aes(beta, term, fill = factor(topic))) +
   geom_col(show.legend = FALSE) +
   facet_wrap(~ topic, scales = "free") +
-  scale_y_reordered()
+  scale_y_reordered() +
+  ggtitle("Top palabras por topic") +
+  theme_minimal()
 ```
 
 Se puede observar como las palabras siguen siendo en general comunes a la mayoría de chistes sin definir claramente ninguna categoría. Para tratar de entender mejor que temáticas pueden haberse definido se ha considerado la detección de las palabras que más se diferencian en la probabilidad de aparición entre dos temática.
@@ -321,14 +338,15 @@ beta_wide %>%
   ggplot(aes(term, log_ratio)) +
     geom_col(show.legend = FALSE) +
     coord_flip() +
-    ggtitle("Topic 1 Vs. Topic 2")
+    ggtitle("Topic 1 Vs. Topic 2") +
+    theme_minimal()
           
   
 ```
 
 
 
-```{r}
+```{r, layout="l-page"}
 num_topics = 5
 pairwise_beta_plots = list()
 
@@ -351,7 +369,7 @@ for (i in 1:num_topics) {
             geom_col(show.legend = FALSE) +
             coord_flip() +
             ylab(sprintf("log(topic_%02d/topic%02d)", j, i)) +
-            theme(text = element_text(size=10))
+            theme(text = element_text(size=8))
     }
   }
 }
@@ -370,9 +388,19 @@ Comparando las temáticas dos a dos se encuentran palabras con frecuencias signi
 
 En este subapartado se han examinado las probabilidades de cada documento de pertenecer a una de las 5 temáticas anteriores.
 
-```{r}
+```{r, code_folding = "Gamma"}
 docs <- tidy(lda_5, matrix="gamma")
-docs
+docs %>%
+  paged_table()
+```
+
+```{r}
+docs %>%
+  ggplot(aes(x  = document, y = gamma, fill = factor(topic))) +
+  geom_bar(stat = "identity", position="stack") +
+  ggtitle("Composición por topics") +
+  scale_fill_discrete(name= "Topic") +
+  theme_minimal()
 ```
 
 Ambos documentos son una mezcla de los *topics* definidos por el modelo. Sin embargo, se puede observar como *1000chistes* prácticamente está formado por las temáticas 4 y 5 (>99%), y *Pintamania* por la 1, 2 y 3. 
@@ -392,15 +420,16 @@ cat %>%
   ggplot(aes(categories, n, fill = factor(categories))) +
   geom_bar(stat="identity") +
   ggtitle("Top categorias", subtitle="Pintamania") +
+  theme_minimal() +
   theme(legend.position = "none",
-        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+        axis.text.x = element_text(angle = 45, vjust = 1.1, hjust=1))
 ```
 
 Se puede ver que la categoría con más chistes no pertenece a ninguna temática en si. Sin embargo, se ha mantenido la categoría para ver si alguna temática definida por el modelo puede captar la entropía de esta *categoría*.  
 
 Para poder calcular el grado de similitud entre los *topics* del modelo y las categorías de *Pintamania* se ha hecho un nuevo corpus en el cual los **documentos** ahora son las diferentes **categorias**. Para ello se ha vuelto a realizar el proceso de los apartados anteriores de *tokenización* y eliminación de las *stop words*, tanto las del paquete *tm* como las que se han añadido en apartados anteriores. Luego, a partir del corpus se ha calculado las metricas de *tf_idf* y se ha definido la DTM.
 
-```{r}
+```{r, layout="l-body-outset"}
 corpus2 = data2 %>%
   select(categories, text) %>%
   filter(categories %in% cat$categories) %>%
@@ -419,7 +448,9 @@ tf_idf_2 %>%
   ggplot(aes(tf_idf, fct_reorder(word, tf_idf), fill = categories )) +
   geom_col(show.legend = F) +
   facet_wrap(~categories, scales = "free") +
-  labs(y = NULL)
+  labs(y = NULL) +
+  ggtitle("Top palabras por categoría") + 
+  theme_minimal() 
 ```
 
 En algunas de las categorías las palabras más importantes no tienen mucho sentido, como por ejemplo en los chistes de amigos, pero para otras si que son palabras relevantes, como es el caso de los chistes de borrachos y los de Jaimito. 
@@ -432,7 +463,8 @@ DTM2 <- corpus2 %>%
   cast_dtm(categories, word, n)
 DTM2
 ```
-```{r}
+
+```{r, layout="l-body-outset"}
 lda2_5 <- LDA(DTM2, k = 5, control = list(seed = 1234))
 topics2_5 <- tidy(lda2_5, matrix = 'beta')
 top_terms2_5 <- topics2_5 %>%
@@ -446,7 +478,9 @@ top_terms2_5 %>%
   ggplot(aes(beta, term, fill = factor(topic))) +
   geom_col(show.legend = FALSE) +
   facet_wrap(~ topic, scales = "free") +
-  scale_y_reordered()
+  scale_y_reordered() +
+  ggtitle("Top palabras por topic") +
+  theme_minimal() 
 ```
 
 Finalmente, se han pivotado las dos tablas para poder calcular las correlaciones: 
@@ -466,9 +500,9 @@ beta_wide2 %<>% column_to_rownames(var = "term")
 nrow(tf_idf_wide2) == nrow(beta_wide2)
 
 cm = cor(tf_idf_wide2, beta_wide2, method = "pearson")
-corrplot::corrplot(cm, method = "color",
+corrplot::corrplot(t(cm), method = "color",
                    addCoef.col = "grey",
-                   tl.col = "black", tl.srt = 45)
+                   tl.col = "black", tl.srt = 45) 
 ```
 
 Del correlograma anterior se puede afirmar que el *topic5* del modelo es el que está más definido por una categoría de chistes, los de *Jaimito*. Además que las categorías de *Jaimito* y *Mamá Mamá* están  relacionadas, ya que los *topics* correlacionados con una temática están correlacionados con la otra, *topic1* y *topic5*. Los otros tres *topics* tinene una correlación débil con con algunas categorías de chistes.
@@ -482,7 +516,7 @@ tf_wide2 <- tf_idf_2 %>%
 tf_wide2 %<>% column_to_rownames(var = "word")
  
 cm2 = cor(tf_wide2, beta_wide2, method = "pearson")
-corrplot::corrplot(cm2, method = "color",
+corrplot::corrplot(t(cm2), method = "color",
                    addCoef.col = "grey",
                    tl.col = "black", tl.srt = 45)
 ```
@@ -490,8 +524,3 @@ corrplot::corrplot(cm2, method = "color",
 Este último correlograma muestra unos valores más elevados que permiten entrever algunas relaicones entre categorías y *topics* que no difieren del correlograma anterior. 
 
 Como conclusión de este análisis, el modelo no ha podido diferenciar eficientemente entre las categorías de chistes. No obstante, no es de extrañar debido a la elevada proporción de faltas ortográficas que provoca la división de una misma palabra en 2, 3 y hasta 4 formas distintas. Además muchas palabras son comunes a la mayoría de categorías y no hay palabras significativamente características en todas ellas, como es el caso de *Jaimito*.
-
-
-
-
-
